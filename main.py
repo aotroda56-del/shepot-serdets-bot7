@@ -1,14 +1,17 @@
 from aiogram import Bot, Dispatcher, types
-from aiogram.utils import executor
+from aiogram.filters import Command
+from aiogram.types import Message, ContentType
+import asyncio
 
-TOKEN = "8445444619:AAFdR4jF1IQJzEFlL_DsJ-JTxT9nwkwwC58"
-ADMIN_CHAT_ID = -1003120877184
+TOKEN = "8445444619:AAFdR4jF1IQJzEFlL_DsJ-JTxT9nwkwwC58"  # твій токен
+ADMIN_CHAT_ID = -1003120877184  # ID адміна або групи
 
 bot = Bot(token=TOKEN)
-dp = Dispatcher(bot)
+dp = Dispatcher()
 
-@dp.message_handler(commands=['start'])
-async def start_command(message: types.Message):
+# Старт
+@dp.message(Command("start"))
+async def cmd_start(message: Message):
     await message.answer(
         "👋 Привет!\n"
         "Рад тебя видеть! 💫\n"
@@ -17,21 +20,30 @@ async def start_command(message: types.Message):
         parse_mode="Markdown"
     )
 
-@dp.message_handler(content_types=types.ContentType.ANY)
-async def forward_to_admins(message: types.Message):
+# Пересилання від користувачів адміну
+@dp.message(lambda m: m.chat.id != ADMIN_CHAT_ID)
+async def forward_to_admin(message: Message):
     user_id = message.from_user.id
     username = f"@{message.from_user.username}" if message.from_user.username else "без_юзернейма"
     text = f"📩 Сообщение от {username} (ID: {user_id}):\n\n{message.text or '[не текстовое сообщение]'}"
     await bot.send_message(ADMIN_CHAT_ID, text)
 
-@dp.message_handler(lambda msg: msg.chat.id == ADMIN_CHAT_ID and msg.reply_to_message)
-async def reply_to_user(message: types.Message):
+# Відповідь від адміна
+@dp.message(lambda m: m.chat.id == ADMIN_CHAT_ID and m.reply_to_message)
+async def reply_to_user(message: Message):
     try:
-        original = message.reply_to_message.text
-        user_id = int(original.split('ID:')[1].split(')')[0])
+        original_text = message.reply_to_message.text
+        user_id = int(original_text.split('ID:')[1].split(')')[0])
         await bot.send_message(user_id, message.text)
     except Exception as e:
         await message.reply(f"⚠️ Ошибка: {e}")
 
+# Запуск бота
+async def main():
+    try:
+        await dp.start_polling(bot)
+    finally:
+        await bot.session.close()
+
 if name == "main":
-    executor.start_polling(dp, skip_updates=True)
+    asyncio.run(main())
